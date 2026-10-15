@@ -12,3 +12,9 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DOCKER_NETWORK=wormsim_devices
+    networks:
+      - default
+
+networks:
+  default:
+    name: wormsim_devices
