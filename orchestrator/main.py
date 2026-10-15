@@ -11,7 +11,15 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from device_manager import DeviceManager
+try:
+    import docker
+    docker.from_env().ping()
+    from device_manager import DeviceManager
+    USING_MOCK = False
+except Exception:
+    from mock_device_manager import DeviceManager
+    USING_MOCK = True
+
 from attacker_agent import run_attacker_tick
 from defender_agent import run_defender_scan
 from metrics import RunMetrics, get_run_data, get_all_runs, export_metrics
@@ -72,6 +80,7 @@ def detect_emergence(tick: int, device_manager_ref, metrics_ref):
 
 
 async def broadcast(msg_type: str, data: dict):
+    global ws_clients
     message = json.dumps({"type": msg_type, **data})
     dead = set()
     for ws in ws_clients:

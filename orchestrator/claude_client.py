@@ -1,4 +1,4 @@
-"""Anthropic API client for agent inference."""
+"""Anthropic API client for agent inference. Falls back to mock when no API key."""
 
 import os
 import json
@@ -9,8 +9,11 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-sonnet-4-6"
 API_URL = "https://api.anthropic.com/v1/messages"
 
-
 async def call_claude(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> dict:
+    if not ANTHROPIC_API_KEY:
+        from mock_claude_client import call_claude as mock_call
+        return await mock_call(system_prompt, user_prompt, max_tokens)
+
     headers = {
         "x-api-key": ANTHROPIC_API_KEY,
         "anthropic-version": "2023-06-01",

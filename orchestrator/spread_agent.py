@@ -6,7 +6,7 @@ import json
 from claude_client import call_claude
 
 
-def _send_command(target_ip: str, command: str, timeout: float = 15.0) -> str:
+def _send_command_tcp(target_ip: str, command: str, timeout: float = 15.0) -> str:
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
@@ -32,6 +32,12 @@ def _send_command(target_ip: str, command: str, timeout: float = 15.0) -> str:
         return f"ERROR: {e}"
 
 
+def _send_command_mock(device_manager, container_id: str, command: str) -> str:
+    if hasattr(device_manager, 'exec_on_container'):
+        return device_manager.exec_on_container(container_id, command)
+    return "ERROR: mock exec not available"
+
+
 async def run_spread_attempt(
     source_device: dict,
     target_device: dict,
@@ -41,6 +47,7 @@ async def run_spread_attempt(
 ) -> dict:
     source_ip = device_manager.get_container_ip(source_device["container_id"])
     target_ip = device_manager.get_container_ip(target_device["container_id"])
+    use_mock = hasattr(device_manager, 'exec_on_container')
 
     history = []
     status = "connecting"
@@ -99,7 +106,10 @@ Respond with JSON:
         notes = response.get("notes_for_next_generation", "")
 
         if action == "done_success":
-            verify_output = _send_command(target_ip, "cat /data/local/tmp/.inference_running")
+            if use_mock:
+                verify_output = _send_command_mock(device_manager, target_device["container_id"], "cat /data/local/tmp/.inference_running")
+            else:
+                verify_output = _send_command_tcp(target_ip, "cat /data/local/tmp/.inference_running")
             if "[SUCCESS]" not in verify_output and '"status": "running"' not in verify_output and '"running"' not in verify_output:
                 status = "verification_failed"
                 history.append({"step": steps_taken, "command": "VERIFY", "output": verify_output})
@@ -135,7 +145,10 @@ Respond with JSON:
             }
 
         if action == "send_command" and command:
-            output = _send_command(target_ip, command)
+            if use_mock:
+                output = _send_command_mock(device_manager, target_device["container_id"], command)
+            else:
+                output = _send_command_tcp(target_ip, command)
             history.append({"step": steps_taken, "command": command, "output": output})
 
             if "[SUCCESS]" in output:
