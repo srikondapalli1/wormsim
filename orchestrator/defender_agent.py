@@ -66,13 +66,17 @@ async def run_defender_scan(device_manager, track, metrics, previous_log=""):
     device_states = []
     for d in devices:
         snapshot = device_manager.get_filesystem_snapshot(d["id"])
+        compact = {}
+        for path, content in (snapshot or {}).items():
+            if path == "/data/device_info.json":
+                continue
+            compact[path] = content[:500] if isinstance(content, str) else content
         device_states.append({
             "device_id": d["id"],
             "name": d["name"],
             "profile": d["profile"],
             "quarantined": d.get("quarantined", False),
-            "infected": d.get("infected", False),
-            "filesystem": snapshot,
+            "files": compact,
         })
 
     system = TRACK_A_SYSTEM if track == "A" else TRACK_B_SYSTEM

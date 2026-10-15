@@ -16,7 +16,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-sonnet-4-6"
 API_URL = "https://api.anthropic.com/v1/messages"
 
-async def call_claude(system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> dict:
+async def call_claude(system_prompt: str, user_prompt: str, max_tokens: int = 2048) -> dict:
     if not ANTHROPIC_API_KEY:
         from mock_claude_client import call_claude as mock_call
         return await mock_call(system_prompt, user_prompt, max_tokens)
@@ -57,4 +57,61 @@ def parse_json_response(text: str) -> dict:
     if start == -1 or end == -1:
         raise ValueError(f"No JSON object found in response: {text[:200]}")
 
-    return json.loads(cleaned[start : end + 1])
+    raw = cleaned[start : end + 1]
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # Truncation repair: close open strings/arrays/objects
+    repaired = raw
+    in_string = False
+    escape = False
+    for ch in raw:
+        if escape:
+            escape = False
+            continue
+        if ch == '\\':
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+    if in_string:
+        repaired += '"'
+
+    open_brackets = 0
+    open_braces = 0
+    in_str = False
+    esc = False
+    for ch in repaired:
+        if esc:
+            esc = False
+            continue
+        if ch == '\\':
+            esc = True
+            continue
+        if ch == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if ch == '[':
+            open_brackets += 1
+        elif ch == ']':
+            open_brackets -= 1
+        elif ch == '{':
+            open_braces += 1
+        elif ch == '}':
+            open_braces -= 1
+
+    # Strip trailing comma before closing
+    repaired = repaired.rstrip()
+    if repaired.endswith(','):
+        repaired = repaired[:-1]
+
+    repaired += ']' * max(0, open_brackets) + '}' * max(0, open_braces)
+
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        raise ValueError(f"Could not parse JSON (even after repair): {text[:300]}")
