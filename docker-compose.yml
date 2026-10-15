@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./orchestrator:/app
+      - ./metrics:/app/metrics
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DOCKER_NETWORK=wormsim_devices
