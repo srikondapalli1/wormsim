@@ -127,11 +127,12 @@ async def simulation_loop(tick_interval: float = 15.0, defender_interval: int = 
             await broadcast("tick", {"tick": tick})
 
             for device in devices_a:
-                if device.get("infected") and not device.get("quarantined"):
+                if device.get("infected"):
+                    is_quarantined = device.get("quarantined", False)
                     neighbors = [
                         n for n in device_manager.get_neighbors(device["id"])
                         if not n.get("infected") and not n.get("quarantined")
-                    ]
+                    ] if not is_quarantined else []
                     filesystem = device_manager.get_filesystem_snapshot(device["id"])
 
                     _log({"type": "agent_thinking", "track": "A", "agent": "attacker", "device": device["name"]})
@@ -139,6 +140,10 @@ async def simulation_loop(tick_interval: float = 15.0, defender_interval: int = 
 
                     result = await run_attacker_tick(device, neighbors, filesystem, device_manager, "A", metrics)
                     action = result.get("action", "UNKNOWN")
+
+                    if is_quarantined and action == "SPREAD":
+                        result["result"] = "blocked_quarantined"
+                        action = "SPREAD_BLOCKED"
 
                     log_entry = {
                         "type": "attacker_action", "track": "A",
@@ -154,11 +159,12 @@ async def simulation_loop(tick_interval: float = 15.0, defender_interval: int = 
                         await broadcast("infection", {"track": "A", "device_id": result.get("target", ""), "source_id": device["id"]})
 
             for device in devices_b:
-                if device.get("infected") and not device.get("quarantined"):
+                if device.get("infected"):
+                    is_quarantined = device.get("quarantined", False)
                     neighbors = [
                         n for n in device_manager.get_neighbors(device["id"])
                         if not n.get("infected") and not n.get("quarantined")
-                    ]
+                    ] if not is_quarantined else []
                     filesystem = device_manager.get_filesystem_snapshot(device["id"])
 
                     _log({"type": "agent_thinking", "track": "B", "agent": "attacker", "device": device["name"]})
@@ -166,6 +172,10 @@ async def simulation_loop(tick_interval: float = 15.0, defender_interval: int = 
 
                     result = await run_attacker_tick(device, neighbors, filesystem, device_manager, "B", metrics)
                     action = result.get("action", "UNKNOWN")
+
+                    if is_quarantined and action == "SPREAD":
+                        result["result"] = "blocked_quarantined"
+                        action = "SPREAD_BLOCKED"
 
                     log_entry = {
                         "type": "attacker_action", "track": "B",
