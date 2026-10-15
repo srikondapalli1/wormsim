@@ -2,8 +2,15 @@
 
 import os
 import json
+from pathlib import Path
 import httpx
 
+env_file = Path(__file__).resolve().parent.parent / ".env"
+if env_file.exists():
+    for line in env_file.read_text().splitlines():
+        if "=" in line and not line.startswith("#"):
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-sonnet-4-6"
